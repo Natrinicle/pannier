@@ -9,7 +9,7 @@ A pannier is a saddlebag. The local bag fills first. The off-side bag only gets 
 ## What v0 does
 
 - Go daemon `pannierd` with an embedded HTML/JS console on loopback (`127.0.0.1:3477`). WAN binds are refused.
-- Engines via exec: `kopia`, `restic`, `borg`, plus an in-memory `fake` engine so `make run` works without those binaries.
+- Engines via exec: `kopia`, `restic`, `borg`, plus an in-memory `fake` engine so `make run` works without those binaries. Host-run cells need the engine on `PATH` (`apt install kopia` or `localRepo.binary`). The Docker/Kubernetes image copies `kopia` 0.23.1, the Docker CLI (dump-via-`docker exec`), and `postgresql-client`; you can also bind-mount `/usr/bin/kopia`.
 - Local repository first, then pack-copy of missing objects to S3 (list + put). Ingest keys never delete. GC lives in `pannier-maint` on a different host with a different key.
 - Web UI for S3 locations, off-side mode (Locked Packs vs Live Engine Repo), cron schedule, which runtimes to bag, named Docker containers, compose projects, Kubernetes namespaces, and dump-first databases. The house bag uses one shared engine so a whole cluster or several namespaces share dedup. Optional tenant copies each get their own engine directory and remotes. Fields PATCH themselves. There is no Save button.
 - Backups is a snapshot list. Open a bag to restore the whole run, one container, or one database beside the live tree. Control-plane etcd stays a sourced sequence, not a live-data-dir button.
@@ -20,7 +20,7 @@ A pannier is a saddlebag. The local bag fills first. The off-side bag only gets 
 
 ## What v0 does not do yet
 
-In-cluster k8s workload/PVC discover is a stub. HTTP S3 uses a `file://` test double. Automated etcd restore is documented, not a button (wrong order corrupts the live cluster). Start-test restore into an isolated namespace is planned. Android, pairing, Unraid CA, and a Svelte rewrite are later. Docker lists containers from the local unix socket (`unix://` only; `tcp://` DOCKER_HOST is refused). Overlay2 layers stay out of the bag. Host (bare metal) is this node's paths; other Swarm or Kubernetes nodes need their own cell.
+In-cluster k8s workload/PVC discover is a stub. Automated etcd restore is documented, not a button (wrong order corrupts the live cluster). Start-test restore into an isolated namespace is planned. Android, pairing, Unraid CA, and a Svelte rewrite are later. Docker lists containers from the local unix socket (`unix://` only; `tcp://` DOCKER_HOST is refused). Overlay2 layers stay out of the bag. Host (bare metal) is this node's paths; other Swarm or Kubernetes nodes need their own cell. HTTP S3 is path-style SigV4 List+Put (MinIO, B2, AWS); ingest keys never Head or Delete.
 
 ## Quick start
 
@@ -40,7 +40,9 @@ mkdir -p "${HOME}/.var/pannier"
 PANNIER_UID="$(id -u)" PANNIER_GID="$(id -g)" docker compose up --build
 ```
 
-The container process binds `0.0.0.0:3477` inside its netns (`PANNIER_CONTAINER_BIND=1`). Compose still publishes only `127.0.0.1:3477` on the host.
+The image includes Kopia 0.23.1. Compose mounts the rootless Docker socket read-only so pannierd can list containers. Bind-mount each host path you want in the bag at the **same** absolute path (named binds under `${HOME}/.var/<stack>` work; overlay2 does not). The container process binds `0.0.0.0:3477` inside its netns (`PANNIER_CONTAINER_BIND=1`). Compose still publishes only `127.0.0.1:3477` on the host.
+
+A small MinIO + Postgres + Adminer smoke (loopback ports, named fixture only, restore into `pannier-verify-*` then tear those down) lives in [deploy/smoke](deploy/smoke). It does not bag every container on the engine. Kind: [deploy/smoke/kind.yaml](deploy/smoke/kind.yaml) has **no** host 80/443 mappings so it does not fight Traefik.
 
 ## Split-key S3
 

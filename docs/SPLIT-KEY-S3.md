@@ -18,12 +18,17 @@ The cell process loads `ingestCreds` only. `ValidateCell()` errors if
 
 Pack-copy algorithm (`internal/s3`):
 
-1. List source packs (`kopia blob list` / restic pack list)
-2. List destination keys
-3. Put keys that are missing
+1. List source packs (walk the local Kopia repo directory; restic pack list).
+   Blob-list IDs are not filesystem paths, so Locked Packs must not treat
+   them as RelPaths.
+2. List destination keys (path-style HTTP S3 or `file://`)
+3. Put keys that are missing (SigV4 List+Put; ingest credentials from files)
 4. Never delete extras
 5. Never Head — write-only Object-Lock policies often deny HeadObject,
    and List already answered membership
+6. Live Engine Repo (`liveRepo: true`) may call `kopia repository sync-to s3`
+   with `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` in the environment,
+   never `--access-key` on argv
 
 ## Steward (GC) — other host
 

@@ -1,0 +1,117 @@
+name: pannier-smoke
+
+services:
+  minio:
+    # Docker Hub minio/minio was removed (2026). This tag is a dated MinIO server build.
+    image: sourcemation/minio:RELEASE.2025-10-15T17-29-55Z
+    container_name: pannier-minio
+    user: "${PANNIER_UID:-1000}:${PANNIER_GID:-1000}"
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER_FILE: /run/minio/root-user
+      MINIO_ROOT_PASSWORD_FILE: /run/minio/root-password
+    ports:
+      - "127.0.0.1:19000:9000"
+      - "127.0.0.1:19001:9001"
+    volumes:
+      - minio-data:/data
+      - minio-keys:/run/minio:ro
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
+
+  fixture-db:
+    image: postgres:16.6-alpine
+    container_name: pannier-fixture-db
+    user: "${PANNIER_UID:-1000}:${PANNIER_GID:-1000}"
+    environment:
+      POSTGRES_USER: pannier
+      POSTGRES_DB: pannier
+      POSTGRES_PASSWORD_FILE: /run/pg/password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "127.0.0.1:18432:5432"
+    volumes:
+      - fixture-db:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01-canary.sql:ro
+      - pg-password:/run/pg:ro
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pannier -d pannier"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  fixture-web:
+    image: adminer:4.8.1
+    container_name: pannier-fixture-web
+    environment:
+      ADMINER_DEFAULT_SERVER: pannier-fixture-db
+    ports:
+      - "127.0.0.1:18480:8080"
+    depends_on:
+      fixture-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  pannierd:
+    build:
+      context: ../..
+      dockerfile: deploy/compose/Dockerfile
+    container_name: pannierd
+    command: ["-listen", "0.0.0.0:3477", "-data", "/data", "-config", "/data/pannier.yaml"]
+    user: "${PANNIER_UID:-1000}:${PANNIER_GID:-1000}"
+    environment:
+      PANNIER_PASSWORD: ${PANNIER_PASSWORD:-}
+      PANNIER_CONTAINER_BIND: "1"
+      DOCKER_HOST: unix:///var/run/docker.sock
+      HOME: /data
+      KOPIA_CACHE_DIRECTORY: /data/cache/kopia
+    ports:
+      - "127.0.0.1:3477:3477"
+    volumes:
+      - pannier-data:/data
+      - ${XDG_RUNTIME_DIR:-/run/user/1000}/docker.sock:/var/run/docker.sock:ro
+      - ${HOME}/.var/pannier-fixture:${HOME}/.var/pannier-fixture:ro
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - minio
+      - fixture-db
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+
+volumes:
+  pannier-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${HOME}/.var/pannier
+  fixture-db:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${HOME}/.var/pannier-fixture/db
+  minio-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${HOME}/.local/share/pannier-minio
+  minio-keys:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${HOME}/.var/minio
+  pg-password:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${HOME}/.var/pannier-fixture/secrets

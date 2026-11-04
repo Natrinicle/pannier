@@ -145,14 +145,17 @@ func (p *Pipeline) backupLocked(ctx context.Context, satchel string) (Result, er
 		return res, fmt.Errorf("cell must not hold Steward keys: %w", err)
 	}
 
+	repo := p.Cfg.Repo()
+	if err := p.Eng.Init(ctx, repo); err != nil {
+		return res, fmt.Errorf("engine init: %w", err)
+	}
+
 	// 2 discover — docker/lxc live list, plus include names as markers.
 	parcels, err := p.discover(ctx)
 	if err != nil {
 		return res, err
 	}
 	p.log("discover: %d parcels", len(parcels))
-
-	repo := p.Cfg.Repo()
 
 	// 3 self-include first — restore of pannier itself must be in the bag
 	// before the rest of the tree is snapshotted.
@@ -212,19 +215,11 @@ func (p *Pipeline) backupLocked(ctx context.Context, satchel string) (Result, er
 		if rem.LiveRepo && !rem.ObjectLock {
 			continue
 		}
-		pc, err := p.Eng.PackCopy(ctx, engine.PackCopyIn{
-			Repo: repo,
-			Dest: engine.ObjectDest{
-				Endpoint:   rem.Endpoint,
-				Bucket:     rem.Bucket,
-				Prefix:     rem.Prefix,
-				Region:     rem.Region,
-				DisableTLS: rem.DisableTLS,
-				ObjectLock: rem.ObjectLock,
-				LiveRepo:   rem.LiveRepo,
-				Role:       engine.RoleIngest,
-			},
-		})
+		dest, err := rem.ObjectDest()
+		if err != nil {
+			return res, fmt.Errorf("pack-copy %s creds: %w", rem.Name, err)
+		}
+		pc, err := p.Eng.PackCopy(ctx, engine.PackCopyIn{Repo: repo, Dest: dest})
 		if err != nil {
 			return res, fmt.Errorf("pack-copy %s: %w", rem.Name, err)
 		}
@@ -236,13 +231,11 @@ func (p *Pipeline) backupLocked(ctx context.Context, satchel string) (Result, er
 		if !rem.LiveRepo || rem.ObjectLock {
 			continue
 		}
-		if _, err := p.Eng.PackCopy(ctx, engine.PackCopyIn{
-			Repo: repo,
-			Dest: engine.ObjectDest{
-				Endpoint: rem.Endpoint, Bucket: rem.Bucket, Prefix: rem.Prefix,
-				Region: rem.Region, LiveRepo: true, Role: engine.RoleIngest,
-			},
-		}); err != nil {
+		dest, err := rem.ObjectDest()
+		if err != nil {
+			return res, fmt.Errorf("live remote %s creds: %w", rem.Name, err)
+		}
+		if _, err := p.Eng.PackCopy(ctx, engine.PackCopyIn{Repo: repo, Dest: dest}); err != nil {
 			return res, fmt.Errorf("live remote %s: %w", rem.Name, err)
 		}
 	}

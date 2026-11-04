@@ -119,15 +119,11 @@ func runOneshot(kind string, cfg config.File, eng engine.Engine) error {
 			sub := s.Apply(cfg)
 			repo := sub.Repo()
 			for _, rem := range sub.Remotes {
-				if _, err := eng.PackCopy(ctx, engine.PackCopyIn{
-					Repo: repo,
-					Dest: engine.ObjectDest{
-						Endpoint: rem.Endpoint, Bucket: rem.Bucket, Prefix: rem.Prefix,
-						Region: rem.Region, DisableTLS: rem.DisableTLS,
-						ObjectLock: rem.ObjectLock, LiveRepo: rem.LiveRepo,
-						Role: engine.RoleIngest,
-					},
-				}); err != nil {
+				dest, err := rem.ObjectDest()
+				if err != nil {
+					return fmt.Errorf("pack-copy %s/%s creds: %w", s.Name, rem.Name, err)
+				}
+				if _, err := eng.PackCopy(ctx, engine.PackCopyIn{Repo: repo, Dest: dest}); err != nil {
 					return fmt.Errorf("pack-copy %s/%s: %w", s.Name, rem.Name, err)
 				}
 			}

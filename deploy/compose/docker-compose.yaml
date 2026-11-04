@@ -5,15 +5,22 @@ services:
       dockerfile: deploy/compose/Dockerfile
     # 0.0.0.0 is the container namespace. Host publish stays 127.0.0.1.
     command: ["-listen", "0.0.0.0:3477", "-data", "/data", "-config", "/data/pannier.yaml"]
+    # Rootful: host uid. Rootless: PANNIER_UID=0 (host user is container root).
     user: "${PANNIER_UID:-1000}:${PANNIER_GID:-1000}"
     environment:
       PANNIER_PASSWORD: ${PANNIER_PASSWORD:-}
       PANNIER_CONTAINER_BIND: "1"
+      DOCKER_HOST: unix:///var/run/docker.sock
+      HOME: /data
+      KOPIA_CACHE_DIRECTORY: /data/cache/kopia
     ports:
       - "127.0.0.1:3477:3477"
     volumes:
       - pannier-data:/data
+      - ${XDG_RUNTIME_DIR:-/run/user/1000}/docker.sock:/var/run/docker.sock:ro
       - /etc/localtime:/etc/localtime:ro
+      # Bind host paths you want to bag at the same absolute path so
+      # pannierd can stat Docker bind mounts. Overlay2 stays out.
     read_only: true
     security_opt:
       - no-new-privileges:true

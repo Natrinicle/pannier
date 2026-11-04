@@ -458,14 +458,14 @@ func (s *Server) runPackCopy(w http.ResponseWriter, r *http.Request) {
 		sub := sat.Apply(cfg)
 		repo := sub.Repo()
 		for _, rem := range sub.Remotes {
+			dest, err := rem.ObjectDest()
+			if err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
 			pc, err := eng.PackCopy(r.Context(), engine.PackCopyIn{
 				Repo: repo,
-				Dest: engine.ObjectDest{
-					Endpoint: rem.Endpoint, Bucket: rem.Bucket, Prefix: rem.Prefix,
-					Region: rem.Region, DisableTLS: rem.DisableTLS,
-					ObjectLock: rem.ObjectLock, LiveRepo: rem.LiveRepo,
-					Role: engine.RoleIngest,
-				},
+				Dest: dest,
 			})
 			if err != nil {
 				http.Error(w, err.Error(), 500)

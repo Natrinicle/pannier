@@ -9,6 +9,7 @@ localRepo:
   path: /var/lib/pannier/repo
   passwordFile: /etc/pannier/repo.password
   kopiaConfig: /etc/pannier/kopia.config
+  # Host: apt install kopia (or restic/borg). Image: /usr/local/bin/kopia.
   binary: kopia
 
 remotes:
@@ -66,7 +67,8 @@ dumps:
   - name: appdb
     kind: postgres
     filename: app.dump
-    command: ["pg_dump", "-Fc", "app"]
+    # postgresql-client is in the image; on the host install it or docker exec.
+    command: ["pg_dump", "-h", "127.0.0.1", "-U", "app", "--no-owner", "--no-acl", "app"]
 
 retention:
   keepLast: 7

@@ -23,6 +23,10 @@ type KopiaEngine struct {
 func (KopiaEngine) Kind() Kind { return Kopia }
 
 func (k KopiaEngine) Init(ctx context.Context, r Repo) error {
+	bin := binary(r, "kopia")
+	if _, err := exec.LookPath(bin); err != nil {
+		return fmt.Errorf("kopia %q not found (install the kopia package, copy it into the image, or set localRepo.binary): %w", bin, err)
+	}
 	base, err := kopiaBase(r)
 	if err != nil {
 		return err
@@ -119,8 +123,10 @@ func (k KopiaEngine) Check(ctx context.Context, in CheckIn) error {
 		pct = 100
 	}
 	argv := append(base, "content", "verify")
-	if pct > 0 {
-		argv = append(argv, "--percent", fmt.Sprintf("%g", pct))
+	if pct >= 100 {
+		argv = append(argv, "--full")
+	} else if pct > 0 {
+		argv = append(argv, "--download-percent", fmt.Sprintf("%g", pct))
 	}
 	_, err = k.R.Run(ctx, nil, nil, argv...)
 	return err
@@ -144,22 +150,24 @@ func (k KopiaEngine) PackCopy(ctx context.Context, in PackCopyIn) (PackCopyResul
 	// Object-lock / write-only prefixes are not live Kopia repositories.
 	// `repository sync-to` onto them hits kopia#3759 (blob-retention) and
 	// would also want to delete. Cell ingest is list+put of missing packs.
+	// Walk the local repo directory: `kopia blob list` IDs are not
+	// filesystem RelPaths (pxxx vs p/pxxx, plus kopia.repository).
 	if in.Dest.ObjectLock || !in.Dest.LiveRepo {
-		packs, err := k.ListPacks(ctx, in.Repo)
+		items, err := listKopiaRepoFiles(in.Repo.Path)
 		if err != nil {
 			return PackCopyResult{}, err
 		}
-		store, err := objs.Open(in.Dest.Endpoint, in.Dest.Bucket, in.Dest.Prefix)
+		store, err := objs.OpenWith(objs.Options{
+			Endpoint:   in.Dest.Endpoint,
+			Bucket:     in.Dest.Bucket,
+			Prefix:     in.Dest.Prefix,
+			Region:     in.Dest.Region,
+			AccessKey:  in.Dest.AccessKey,
+			SecretKey:  in.Dest.SecretKey,
+			DisableTLS: in.Dest.DisableTLS,
+		})
 		if err != nil {
 			return PackCopyResult{}, err
-		}
-		items := make([]objs.Object, 0, len(packs))
-		for _, p := range packs {
-			key := p.Key
-			if key == "" {
-				key = p.RelPath
-			}
-			items = append(items, objs.Object{Key: key, Size: p.Size, RelPath: p.RelPath})
 		}
 		open := func(_ context.Context, o objs.Object) (io.Reader, int64, error) {
 			path := packFilePath(in.Repo.Path, o)
@@ -201,7 +209,7 @@ func (k KopiaEngine) PackCopy(ctx context.Context, in PackCopyIn) (PackCopyResul
 	if in.Dest.DisableTLS {
 		argv = append(argv, "--disable-tls")
 	}
-	_, err = k.R.Run(ctx, nil, nil, argv...)
+	_, err = k.R.Run(ctx, nil, s3Env(in.Dest), argv...)
 	return PackCopyResult{}, err
 }
 
@@ -213,23 +221,37 @@ func (k KopiaEngine) ForgetPrune(ctx context.Context, in ForgetIn) error {
 	if err != nil {
 		return err
 	}
-	argv := append(base, "snapshot", "expire", "--delete")
+	// kopia 0.23: keep-* flags live on `policy set`. `snapshot expire`
+	// only has --all --delete. KeepWithin is restic/borg; kopia has no
+	// duration equivalent here.
+	policy := append(base, "policy", "set", "--global")
+	set := false
 	if in.KeepLast > 0 {
-		argv = append(argv, "--keep-latest", fmt.Sprintf("%d", in.KeepLast))
+		policy = append(policy, "--keep-latest", fmt.Sprintf("%d", in.KeepLast))
+		set = true
 	}
 	if in.KeepDaily > 0 {
-		argv = append(argv, "--keep-daily", fmt.Sprintf("%d", in.KeepDaily))
+		policy = append(policy, "--keep-daily", fmt.Sprintf("%d", in.KeepDaily))
+		set = true
 	}
 	if in.KeepWeekly > 0 {
-		argv = append(argv, "--keep-weekly", fmt.Sprintf("%d", in.KeepWeekly))
+		policy = append(policy, "--keep-weekly", fmt.Sprintf("%d", in.KeepWeekly))
+		set = true
 	}
 	if in.KeepMonthly > 0 {
-		argv = append(argv, "--keep-monthly", fmt.Sprintf("%d", in.KeepMonthly))
+		policy = append(policy, "--keep-monthly", fmt.Sprintf("%d", in.KeepMonthly))
+		set = true
 	}
 	if in.KeepYearly > 0 {
-		argv = append(argv, "--keep-annual", fmt.Sprintf("%d", in.KeepYearly))
+		policy = append(policy, "--keep-annual", fmt.Sprintf("%d", in.KeepYearly))
+		set = true
 	}
-	if _, err := k.R.Run(ctx, nil, nil, argv...); err != nil {
+	if set {
+		if _, err := k.R.Run(ctx, nil, nil, policy...); err != nil {
+			return err
+		}
+	}
+	if _, err := k.R.Run(ctx, nil, nil, append(base, "snapshot", "expire", "--all", "--delete")...); err != nil {
 		return err
 	}
 	if in.Prune {
@@ -277,6 +299,62 @@ func packFilePath(repo string, o objs.Object) string {
 		rel = o.Key
 	}
 	return filepath.Join(repo, filepath.FromSlash(rel))
+}
+
+func listKopiaRepoFiles(root string) ([]objs.Object, error) {
+	root = strings.TrimSpace(root)
+	if root == "" {
+		return nil, fmt.Errorf("kopia repo path is empty")
+	}
+	st, err := os.Stat(root)
+	if err != nil {
+		return nil, fmt.Errorf("kopia repo %s: %w", root, err)
+	}
+	if !st.IsDir() {
+		return nil, fmt.Errorf("kopia repo %s: not a directory", root)
+	}
+	var out []objs.Object
+	err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		name := info.Name()
+		if strings.HasSuffix(name, ".tmp") || strings.HasSuffix(name, ".lock") {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		if rel == "." || strings.Contains(rel, "..") {
+			return nil
+		}
+		out = append(out, objs.Object{Key: rel, RelPath: rel, Size: info.Size()})
+		return nil
+	})
+	return out, err
+}
+
+func s3Env(d ObjectDest) []string {
+	region := strings.TrimSpace(d.Region)
+	if region == "" {
+		region = "us-east-1"
+	}
+	env := []string{
+		"AWS_REGION=" + region,
+		"AWS_DEFAULT_REGION=" + region,
+	}
+	if d.AccessKey != "" {
+		env = append(env, "AWS_ACCESS_KEY_ID="+d.AccessKey)
+	}
+	if d.SecretKey != "" {
+		env = append(env, "AWS_SECRET_ACCESS_KEY="+d.SecretKey)
+	}
+	return env
 }
 
 func withMaxDuration(ctx context.Context, sec int) (context.Context, context.CancelFunc) {

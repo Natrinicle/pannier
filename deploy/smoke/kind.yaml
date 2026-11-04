@@ -1,0 +1,11 @@
+# Kind cluster for Pannier smoke. Do not copy ~/repos/home/kind/config.yaml:
+# that file maps host 80/443 (Traefik already owns those on this laptop).
+# No extraPortMappings. API server stays on a high loopback port.
+# Do not recreate or delete the cluster named "kind".
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: pannier-smoke
+nodes:
+  - role: control-plane
+networking:
+  ipFamily: ipv4

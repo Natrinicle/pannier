@@ -81,6 +81,8 @@ type ObjectDest struct {
 	DisableTLS                       bool
 	ObjectLock                       bool
 	LiveRepo                         bool
+	AccessKey                        string
+	SecretKey                        string
 	Role                             CredRole
 }
 

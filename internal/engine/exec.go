@@ -61,13 +61,15 @@ func RedactArgv(argv []string) []string {
 	for i := 0; i < len(out); i++ {
 		a := out[i]
 		switch a {
-		case "-p", "--password", "--passphrase", "--from-command":
+		case "-p", "--password", "--passphrase", "--from-command",
+			"--access-key", "--secret-access-key", "--access-key-id":
 			if i+1 < len(out) {
 				out[i+1] = "***"
 				i++
 			}
 		default:
-			for _, p := range []string{"--password=", "-p=", "--passphrase="} {
+			for _, p := range []string{"--password=", "-p=", "--passphrase=",
+				"--access-key=", "--secret-access-key=", "--access-key-id="} {
 				if strings.HasPrefix(a, p) {
 					out[i] = p + "***"
 				}
