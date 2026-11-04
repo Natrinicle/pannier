@@ -1,0 +1,13 @@
+Pannier is licensed under the GNU Lesser General Public License
+version 3 or any later version, as published by the Free Software
+Foundation.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this program as COPYING.LESSER, and a copy of
+the GNU General Public License as COPYING. If not, see
+<https://www.gnu.org/licenses/>.
+
+SPDX-License-Identifier: LGPL-3.0-or-later
+
+Engines (Kopia, restic, Borg) are invoked as separate processes.
+They keep their own licenses. This program does not link them.

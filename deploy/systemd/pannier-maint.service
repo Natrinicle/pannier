@@ -1,0 +1,8 @@
+[Unit]
+Description=Pannier Steward GC (maintenance host only)
+
+[Service]
+Type=oneshot
+User=pannier
+ExecStart=/usr/local/bin/pannier-maint -config /etc/pannier/pannier-maint.yaml -data /var/lib/pannier-maint
+# Refuses a cell ingest-only YAML. Do not point this at pannier.yaml on the cell.

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pannier</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="gate" class="gate">
+    <div class="gate-card">
+      <svg class="mark" viewBox="0 0 64 40" aria-hidden="true"><use href="#bag"/></svg>
+      <h1>Pannier</h1>
+      <p>Local bag first. Off-side bag gets the unique packs.</p>
+      <label>Console Password
+        <input id="pw" type="password" autocomplete="current-password">
+      </label>
+      <button type="button" id="unlock">Open the Flap</button>
+      <p class="hint">Loopback only. Bearer token from PANNIER_PASSWORD or the generated file.</p>
+    </div>
+  </div>
+
+  <svg xmlns="http://www.w3.org/2000/svg" class="defs" aria-hidden="true">
+    <symbol id="bag" viewBox="0 0 64 40">
+      <path d="M8 16h48v20c0 2-2 4-4 4H12c-2 0-4-2-4-4V16z" fill="currentColor" opacity=".92"/>
+      <path d="M20 16c0-8 4-14 12-14s12 6 12 14" fill="none" stroke="currentColor" stroke-width="3"/>
+      <path d="M8 22h48" stroke="#f6f1e6" stroke-width="2" opacity=".4"/>
+    </symbol>
+  </svg>
+
+  <div id="app" class="app hidden">
+    <aside class="rail">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 64 40"><use href="#bag"/></svg>
+        <div>
+          <strong>Pannier</strong>
+          <small>saddlebags for bits</small>
+        </div>
+      </div>
+      <nav>
+        <button data-view="overview" class="on">Overview</button>
+        <button data-view="anomalies">Anomalies</button>
+        <button data-view="backups">Backups</button>
+        <button data-view="settings">Settings</button>
+      </nav>
+      <p class="rail-copy">Porter can put and list. Steward can sweep. They never ride the same horse.</p>
+    </aside>
+    <main>
+      <section id="view-overview" class="view">
+        <header>
+          <h1>Overview</h1>
+          <p class="lede">Three copies, two kinds of bag, one of them not this disk.</p>
+        </header>
+        <div class="ring" id="three-two-one">
+          <article class="bag-card">
+            <h2>1 · Local Bag</h2>
+            <p>Filesystem repo on this cell. First write, first verify.</p>
+          </article>
+          <article class="bag-card">
+            <h2>2 · Same-Site Spare</h2>
+            <p>Another disk, or a live engine repo if you keep one.</p>
+          </article>
+          <article class="bag-card off">
+            <h2>3 · Off-Side Bag</h2>
+            <p>Locked packs by default. Unique chunks only. No deletes from here.</p>
+          </article>
+        </div>
+        <div class="status-line" id="status-line"></div>
+      </section>
+
+      <section id="view-anomalies" class="view hidden">
+        <header>
+          <h1>Anomalies</h1>
+          <p class="lede">Bags that forgot to come home, or never left.</p>
+        </header>
+        <ul id="flags" class="flags"></ul>
+      </section>
+
+      <section id="view-backups" class="view hidden">
+        <header>
+          <h1>Backups</h1>
+          <p class="lede">Each row is one bag. House bags share the cell engine. Tenant bags are a separate directory. Open a row to restore the whole bag, one container, or one database.</p>
+        </header>
+        <div class="bags-layout">
+          <div>
+            <table class="parcels bags">
+              <thead><tr><th>Bag</th><th>Satchel</th><th>Parcels</th><th>Sites</th></tr></thead>
+              <tbody id="bags"></tbody>
+            </table>
+            <p id="bags-empty" class="empty hidden">No bags yet. Run a bag to snapshot the current selection.</p>
+            <button type="button" id="run-backup" class="ghost">Run a Bag Now</button>
+          </div>
+          <div id="bag-detail" class="bag-detail hidden">
+            <h2 id="bag-title">Inside</h2>
+            <p class="lede" id="bag-lede"></p>
+            <table class="parcels">
+              <thead><tr><th></th><th>Parcel</th><th>Kind</th><th>Restore</th></tr></thead>
+              <tbody id="bag-contents"></tbody>
+            </table>
+            <label>Restore Beside
+              <input id="restore-target" spellcheck="false" placeholder="data dir / restore / bag id">
+            </label>
+            <div class="restore-actions">
+              <button type="button" id="restore-selected">Restore Selected</button>
+              <button type="button" id="restore-all" class="ghost">Restore Entire Bag</button>
+            </div>
+            <p id="restore-msg" class="hint"></p>
+            <aside id="cp-sequence" class="sequence hidden">
+              <h2>Control Plane Restore Sequence</h2>
+              <p class="lede">etcd and kubeadm files are not a one-click onto the live data-dir. Follow this order on the node.</p>
+              <ol class="restore-steps">
+                <li>Stop every API server first.</li>
+                <li>Restore etcd into a <em>new</em> data-dir (never the live one).</li>
+                <li>Point etcd.yaml hostPath and kubeadm-config dataDir at that dir.</li>
+                <li>Bring back /etc/etcd only if that tree existed on the node.</li>
+              </ol>
+              <p>See docs/K8S-RESTORE.md.</p>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-settings" class="view hidden">
+        <header>
+          <h1>Settings</h1>
+          <p class="lede">No Save. Fields patch themselves after you pause typing.</p>
+        </header>
+
+        <fieldset>
+          <legend>House · Shared Engine</legend>
+          <p class="hint">One Kopia, restic, or borg directory on this cell. Whole cluster, several namespaces, several compose projects, or several containers share deduplication here. Run a bag now still packs this satchel even when tenant copies exist.</p>
+          <label class="chk"><input type="checkbox" data-sel="docker"> Docker</label>
+          <label class="chk"><input type="checkbox" data-sel="k8s"> Kubernetes</label>
+          <label class="chk"><input type="checkbox" data-sel="controlPlane"> Control Plane (etcd)</label>
+          <label class="chk"><input type="checkbox" data-sel="lxc"> LXC</label>
+          <label class="chk"><input type="checkbox" data-sel="bareMetal"> Host (Bare Metal)</label>
+          <p class="hint">Control Plane is the etcd keyspace plus kubeadm files. It is the whole cluster. Leave it on for operator disaster recovery. Namespace filters below still share this engine.</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>House Scope</legend>
+          <p class="hint">Empty Kubernetes namespaces means every namespace this cell can see, plus etcd when Control Plane is on. Named namespaces (one per line) still share the house engine. Empty Docker include means every container on this engine. Host paths are this node only — Swarm tasks and Kubernetes pods on other nodes need a cell on those nodes.</p>
+          <label>Namespaces
+            <textarea id="namespaces" spellcheck="false" rows="3" placeholder="acme&#10;beta"></textarea>
+          </label>
+          <label>Compose Projects
+            <textarea id="compose-projects" spellcheck="false" rows="3" placeholder="shop"></textarea>
+          </label>
+          <label>Include Names
+            <textarea id="include-containers" spellcheck="false" rows="4" placeholder="web&#10;db"></textarea>
+          </label>
+          <label>Skip Names
+            <textarea id="skip-containers" spellcheck="false" rows="3" placeholder="build-cache"></textarea>
+          </label>
+          <label>Host Paths
+            <textarea id="host-paths" spellcheck="false" rows="3" placeholder="/etc&#10;/var/lib/kubelet"></textarea>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Database Dumps</legend>
+          <p class="hint">Dump first, then hash. Each database is its own parcel. Restore one dump without the rest of the bag. A failed dump fails that row only.</p>
+          <table class="parcels dumps">
+            <thead><tr><th>Name</th><th>Kind</th><th>Command</th><th></th></tr></thead>
+            <tbody id="dumps"></tbody>
+          </table>
+          <p id="dumps-empty" class="empty hidden">No dumps yet. Add a PostgreSQL, MySQL, or MariaDB command.</p>
+          <button type="button" id="add-dump" class="ghost">Add a Dump</button>
+        </fieldset>
+
+        <fieldset>
+          <legend>Cadence</legend>
+          <label>Backup Cron <input data-sched="backup" spellcheck="false"></label>
+          <label>Pack-Copy Cron <input data-sched="packcopy" spellcheck="false"></label>
+          <label>Check Cron <input data-sched="check" spellcheck="false"></label>
+          <label>Maint Cron (Steward Host) <input data-sched="maint" spellcheck="false"></label>
+        </fieldset>
+
+        <fieldset>
+          <legend>House Off-Side Locations</legend>
+          <p class="hint">The shared engine can copy unique packs to more than one remote. Each location has its own Off-Side Mode. Locked Packs is the default for stores like B2 that charge extra for reads and deletes.</p>
+          <div id="house-locations"></div>
+          <button type="button" id="add-location" class="ghost">Add a Location</button>
+        </fieldset>
+
+        <div class="dual" id="dual-key-well">
+          <section>
+            <h2>Porter · Ingest</h2>
+            <p>List and put. No delete. Paths live on each location card above.</p>
+          </section>
+          <section class="steward">
+            <h2>Steward · GC</h2>
+            <p>Delete and lifecycle. Lives on the maintenance host. A cell that can load these keys is mis-packed.</p>
+            <label>Access Key File <input data-steward="accessKeyFile" disabled placeholder="not on a cell"></label>
+            <label>Secret Key File <input data-steward="secretKeyFile" disabled placeholder="not on a cell"></label>
+          </section>
+        </div>
+
+        <fieldset>
+          <legend>Tenant Copies</legend>
+          <p class="hint">A separate engine directory per customer or service. Their off-side bag never contains house data or another tenant. Extra local disk and CPU. The house bag still runs.</p>
+          <div id="satchels"></div>
+          <p id="satchels-empty" class="empty hidden">No tenant copies. House uses the shared engine for everything you ticked above.</p>
+          <button type="button" id="add-satchel" class="ghost">Add a Tenant Copy</button>
+          <p id="satchel-err" class="hint"></p>
+        </fieldset>
+      </section>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

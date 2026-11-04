@@ -1,0 +1,10 @@
+[Unit]
+Description=Pannier nightly local bag
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+Unit=pannier-backup.service
+
+[Install]
+WantedBy=timers.target

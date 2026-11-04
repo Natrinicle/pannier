@@ -1,0 +1,7 @@
+/pannierd
+/pannier-maint
+*.exe
+*.test
+/data/
+.remember/
+.DS_Store

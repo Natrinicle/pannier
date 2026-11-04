@@ -1,0 +1,77 @@
+# Cell process. Ingest (Porter) credentials only.
+# ValidateCell() fails if maintenanceCreds appear in this file.
+engine: kopia
+listen: 127.0.0.1:3477
+dataDir: /var/lib/pannier
+selfInclude: true
+
+localRepo:
+  path: /var/lib/pannier/repo
+  passwordFile: /etc/pannier/repo.password
+  kopiaConfig: /etc/pannier/kopia.config
+  binary: kopia
+
+remotes:
+  - name: off-side
+    endpoint: s3.example.com
+    bucket: pannier-packs
+    prefix: cell-a/
+    region: us-east-1
+    objectLock: true
+    liveRepo: false
+    ingestCreds:
+      accessKeyFile: /etc/pannier/ingest-access
+      secretKeyFile: /etc/pannier/ingest-secret
+
+schedule:
+  backup: "0 2 * * *"
+  packcopy: "30 2 * * *"
+  check: "0 4 * * 0"
+  maint: "0 5 * * 0"
+
+selection:
+  docker: true
+  k8s: true
+  lxc: false
+  bareMetal: true
+  controlPlane: true
+  # Empty containers: every name Docker reports. Skip is a denylist.
+  # Named namespaces still share this engine (one Kopia directory).
+  containers: [web, db]
+  skipContainers: [build-cache]
+  namespaces: []
+  composeProjects: []
+  hostPaths: [/etc]
+
+# Extra isolated copies. Each is its own engine directory and remotes.
+# House above still bags the shared engine at the same time.
+# satchels:
+#   - name: acme
+#     localRepo:
+#       path: /var/lib/pannier/satchels/acme
+#     selection:
+#       k8s: true
+#       namespaces: [acme]
+#     remotes:
+#       - name: acme-off-side
+#         endpoint: s3.acme.example
+#         bucket: acme-backups
+#         prefix: pannier/
+#         objectLock: true
+#         ingestCreds:
+#           accessKeyFile: /etc/pannier/acme-ingest-access
+#           secretKeyFile: /etc/pannier/acme-ingest-secret
+
+dumps:
+  - name: appdb
+    kind: postgres
+    filename: app.dump
+    command: ["pg_dump", "-Fc", "app"]
+
+retention:
+  keepLast: 7
+  keepDaily: 14
+  keepWeekly: 8
+  keepMonthly: 12
+  keepYearly: 3
+  prune: true

@@ -1,0 +1,9 @@
+[Unit]
+Description=Pannier pack-copy ingest (Porter)
+After=pannierd.service
+Requires=pannierd.service
+
+[Service]
+Type=oneshot
+User=pannier
+ExecStart=/usr/local/bin/pannierd -run packcopy -config /etc/pannier/pannier.yaml -data /var/lib/pannier

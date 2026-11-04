@@ -1,0 +1,39 @@
+# Maintenance host only. Holds Steward (GC) credentials.
+# pannier-maint refuses to start without maintenanceCreds, and refuses
+# a cell ingest-only file.
+engine: kopia
+listen: 127.0.0.1:3478
+dataDir: /var/lib/pannier-maint
+selfInclude: false
+
+localRepo:
+  path: /var/lib/pannier-maint/repo
+  passwordFile: /etc/pannier/repo.password
+  kopiaConfig: /etc/pannier/kopia-maint.config
+  binary: kopia
+
+remotes:
+  - name: off-side
+    endpoint: s3.example.com
+    bucket: pannier-packs
+    prefix: cell-a/
+    region: us-east-1
+    objectLock: true
+    liveRepo: false
+    ingestCreds:
+      accessKeyFile: /etc/pannier/ingest-access
+      secretKeyFile: /etc/pannier/ingest-secret
+    maintenanceCreds:
+      accessKeyFile: /etc/pannier/gc-access
+      secretKeyFile: /etc/pannier/gc-secret
+
+schedule:
+  maint: "0 5 * * 0"
+
+retention:
+  keepLast: 7
+  keepDaily: 14
+  keepWeekly: 8
+  keepMonthly: 12
+  keepYearly: 3
+  prune: true

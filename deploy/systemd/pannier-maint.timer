@@ -1,0 +1,10 @@
+[Unit]
+Description=Pannier weekly Steward GC
+
+[Timer]
+OnCalendar=Sun *-*-* 05:00:00
+Persistent=true
+Unit=pannier-maint.service
+
+[Install]
+WantedBy=timers.target

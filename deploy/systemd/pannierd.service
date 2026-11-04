@@ -1,0 +1,21 @@
+[Unit]
+Description=Pannier backup daemon (loopback console)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pannier
+Group=pannier
+ExecStart=/usr/local/bin/pannierd -listen 127.0.0.1:3477 -config /etc/pannier/pannier.yaml -data /var/lib/pannier
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/pannier
+PrivateTmp=yes
+# Console password: PANNIER_PASSWORD or /var/lib/pannier/console.password (0600).
+
+[Install]
+WantedBy=multi-user.target

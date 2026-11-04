@@ -1,0 +1,10 @@
+[Unit]
+Description=Pannier off-side pack copy
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+Unit=pannier-packcopy.service
+
+[Install]
+WantedBy=timers.target

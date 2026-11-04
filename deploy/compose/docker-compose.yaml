@@ -1,0 +1,30 @@
+services:
+  pannierd:
+    build:
+      context: ../..
+      dockerfile: deploy/compose/Dockerfile
+    # 0.0.0.0 is the container namespace. Host publish stays 127.0.0.1.
+    command: ["-listen", "0.0.0.0:3477", "-data", "/data", "-config", "/data/pannier.yaml"]
+    user: "${PANNIER_UID:-1000}:${PANNIER_GID:-1000}"
+    environment:
+      PANNIER_PASSWORD: ${PANNIER_PASSWORD:-}
+      PANNIER_CONTAINER_BIND: "1"
+    ports:
+      - "127.0.0.1:3477:3477"
+    volumes:
+      - pannier-data:/data
+      - /etc/localtime:/etc/localtime:ro
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+
+volumes:
+  pannier-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${HOME}/.var/pannier

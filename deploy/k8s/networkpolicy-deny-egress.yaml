@@ -1,0 +1,13 @@
+# Default deny all egress in the restore-start-test namespace.
+# Source: https://kubernetes.io/docs/concepts/services-networking/network-policies/#default-deny-all-egress-traffic
+# A default deny-all egress policy also blocks DNS. Add a separate allow
+# to kube-dns only if the canary restore actually needs name resolution.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: restore-start-test
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress

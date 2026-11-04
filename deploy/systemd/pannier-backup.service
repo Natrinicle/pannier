@@ -1,0 +1,10 @@
+[Unit]
+Description=Pannier backup once
+After=pannierd.service
+Requires=pannierd.service
+
+[Service]
+Type=oneshot
+User=pannier
+# Direct oneshot. Do not curl a Bearer token; that lands on argv via $(cat).
+ExecStart=/usr/local/bin/pannierd -run backup -config /etc/pannier/pannier.yaml -data /var/lib/pannier

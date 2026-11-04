@@ -1,0 +1,12 @@
+Pannier
+Copyright (C) 2026 Pannier contributors
+
+This product includes no copies of BombVault source. The public
+BombVault README (junkerderprovinz/bombvault, AGPL-3.0) inspired
+the interaction model: one list of entries, Overview / Anomalies /
+Backups / Restore / Settings, dump-first databases, off-site copy
+of unique packs, restore proofs, and self-backup of settings.
+
+Kopia is Apache-2.0. restic is BSD-2-Clause. Borg is BSD-3-Clause.
+Those binaries are optional runtime dependencies, executed as
+subprocesses, not linked into this program.

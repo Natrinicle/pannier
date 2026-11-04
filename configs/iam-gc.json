@@ -1,0 +1,25 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "StewardList",
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket"],
+      "Resource": "arn:aws:s3:::example-pannier-packs"
+    },
+    {
+      "Sid": "StewardSweep",
+      "Effect": "Allow",
+      "Action": [
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:PutLifecycleConfiguration",
+        "s3:GetLifecycleConfiguration"
+      ],
+      "Resource": [
+        "arn:aws:s3:::example-pannier-packs",
+        "arn:aws:s3:::example-pannier-packs/*"
+      ]
+    }
+  ]
+}
