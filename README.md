@@ -52,4 +52,4 @@ An etcd snapshot is the API-object keyspace. It does not include PVC bytes, imag
 
 ## License
 
-[LGPL-3.0-or-later](LICENSE). Full texts: [COPYING.LESSER](COPYING.LESSER) and [COPYING](COPYING). Kopia, restic, and Borg stay optional runtime binaries with their own licenses; this program execs them and does not link them. Provenance notes are in [NOTICE](NOTICE).
+[LGPL-3.0-or-later](LICENSE). LGPLv3 is additional permissions on GPLv3; the GNU GPL text is [LICENSES/GPL-3.0.txt](LICENSES/GPL-3.0.txt). A GNU-named copy of the Lesser license is [COPYING.LESSER](COPYING.LESSER). Kopia, restic, and Borg stay optional runtime binaries with their own licenses; this program execs them and does not link them. Provenance notes are in [NOTICE](NOTICE).
